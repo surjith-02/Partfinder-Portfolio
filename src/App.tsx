@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { AnimatedBackground } from './components/AnimatedBackground'
 
 const ADMIN_TOKEN_KEY = 'pf_admin_token'
 
 /** In dev, prefer same-origin `/api` (Vite proxy) unless VITE_API_URL is set — avoids stale SW/caches to :3000. */
 const apiBase =
   import.meta.env.VITE_API_URL?.replace(/\/$/, '') ??
-  (import.meta.env.DEV ? '' : 'http://localhost:3000')
+  (import.meta.env.DEV ? '' : 'https://partfinder-backend.vercel.app')
 
 function parseApiErrorMessage(body: unknown): string {
   if (!body || typeof body !== 'object') {
@@ -53,98 +52,43 @@ function postLoginPath(pathname: string): string {
   return '/admin/dashboard'
 }
 
-const ThemeToggleBtn = ({ theme, onToggleTheme }: { theme: 'light' | 'dark'; onToggleTheme: () => void }) => {
-  return (
-    <button
-      type="button"
-      className="theme-toggle-btn"
-      onClick={onToggleTheme}
-      aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-      title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-    >
-      {theme === 'light' ? (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="5" />
-          <line x1="12" y1="1" x2="12" y2="3" />
-          <line x1="12" y1="21" x2="12" y2="23" />
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-          <line x1="1" y1="12" x2="3" y2="12" />
-          <line x1="21" y1="12" x2="23" y2="12" />
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-        </svg>
-      )}
-    </button>
-  )
-}
-
 function App() {
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = window.localStorage.getItem('pf_portfolio_theme')
-      if (stored === 'light' || stored === 'dark') {
-        return stored
-      }
-    }
-    return 'dark'
-  })
-
-  useEffect(() => {
-    const root = document.documentElement
-    if (theme === 'light') {
-      root.classList.add('light-theme')
-      root.classList.remove('dark-theme')
-    } else {
-      root.classList.add('dark-theme')
-      root.classList.remove('light-theme')
-    }
-    window.localStorage.setItem('pf_portfolio_theme', theme)
-  }, [theme])
-
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))
-  }
-
   return (
     <Routes>
-      <Route path="/" element={<MarketingHomePage theme={theme} onToggleTheme={toggleTheme} />} />
-      <Route path="/admin/*" element={<AdminPortalPage theme={theme} onToggleTheme={toggleTheme} />} />
-      <Route path="/home" element={<Navigate to="/" replace />} />
+      <Route path="/" element={<PublicDashboardPage />} />
+      <Route path="/dashboard" element={<PublicDashboardPage />} />
+      <Route path="/admin/*" element={<AdminPortalPage />} />
+      <Route path="/home" element={<Navigate to="/dashboard" replace />} />
       <Route path="/test" element={<R4a />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
 }
 
-function MarketingHomePage({ theme, onToggleTheme }: { theme: 'light' | 'dark'; onToggleTheme: () => void }) {
+function PublicDashboardPage() {
   return (
-    <>
-      <AnimatedBackground theme={theme} />
-      <ThemeToggleBtn theme={theme} onToggleTheme={onToggleTheme} />
-      <main className="page">
-        <header className="hero">
-          <p className="badge">PartFinder Platform</p>
-          <h1>Modern spare parts platform for vendors and manufacturers</h1>
-          <p className="sub">
-            Manage parts, users, and organizations from one simple admin panel.
-          </p>
-          <div className="actions">
-            <Link to="/admin" className="btn-primary">
-              Admin Panel
-            </Link>
-          </div>
-        </header>
-      </main>
-    </>
+    <main className="page">
+      <header className="hero">
+        <p className="badge">PartFinder Dashboard</p>
+        <h1>Everyone can view the live platform dashboard</h1>
+        <p className="sub">
+          See the headline metrics and open the admin area when you need to manage the platform.
+        </p>
+        <div className="actions">
+          <Link to="/admin/dashboard" className="btn-primary">
+            Open Dashboard
+          </Link>
+          <Link to="/admin" className="btn-primary">
+            Admin Login
+          </Link>
+        </div>
+      </header>
+      <DashboardSection />
+    </main>
   )
 }
 
-function AdminPortalPage({ theme, onToggleTheme }: { theme: 'light' | 'dark'; onToggleTheme: () => void }) {
+function AdminPortalPage() {
   const defaultDevEmail =
     import.meta.env.MODE === 'development' ? 'jayandraa5@gmail.com' : ''
   const [email, setEmail] = useState(defaultDevEmail)
@@ -154,6 +98,9 @@ function AdminPortalPage({ theme, onToggleTheme }: { theme: 'light' | 'dark'; on
   const [loginPending, setLoginPending] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+  const isPublicDashboardRoute =
+    location.pathname === '/admin/dashboard' ||
+    location.pathname === '/dashboard'
 
   const handleSessionExpired = useCallback(() => {
     window.localStorage.removeItem(ADMIN_TOKEN_KEY)
@@ -188,12 +135,6 @@ function AdminPortalPage({ theme, onToggleTheme }: { theme: 'light' | 'dark'; on
       })
       const data: unknown = await response.json().catch(() => null)
       if (!response.ok) {
-        if (email.trim() === 'jayandraa5@gmail.com' && password === 'J@yandra06') {
-          window.localStorage.setItem(ADMIN_TOKEN_KEY, 'mock_admin_token_jwt_jayandraa5')
-          setIsAuthenticated(true)
-          navigate(postLoginPath(location.pathname), { replace: true })
-          return
-        }
         setError(parseApiErrorMessage(data))
         return
       }
@@ -206,56 +147,64 @@ function AdminPortalPage({ theme, onToggleTheme }: { theme: 'light' | 'dark'; on
       setIsAuthenticated(true)
       navigate(postLoginPath(location.pathname), { replace: true })
     } catch {
-      if (email.trim() === 'jayandraa5@gmail.com' && password === 'J@yandra06') {
-        window.localStorage.setItem(ADMIN_TOKEN_KEY, 'mock_admin_token_jwt_jayandraa5')
-        setIsAuthenticated(true)
-        navigate(postLoginPath(location.pathname), { replace: true })
-        return
-      }
       setError('Cannot reach the server. Is the API running?')
     } finally {
       setLoginPending(false)
     }
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !isPublicDashboardRoute) {
     return (
-      <>
-        <AnimatedBackground theme={theme} />
-        <ThemeToggleBtn theme={theme} onToggleTheme={onToggleTheme} />
-        <main className="auth-page">
-          <section className="auth-card">
-            <h1>Admin Portal Login</h1>
-            <p>Sign in with your email and password.</p>
+      <main className="auth-page">
+        <section className="auth-card">
+          <h1>Admin Portal Login</h1>
+          <p>Sign in with your email and password.</p>
 
-            <form className="auth-form" onSubmit={handleLogin}>
-              <label htmlFor="admin-email">Email ID</label>
-              <input
-                id="admin-email"
-                type="email"
-                placeholder="admin@partfinder.com"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
+          <form className="auth-form" onSubmit={handleLogin}>
+            <label htmlFor="admin-email">Email ID</label>
+            <input
+              id="admin-email"
+              type="email"
+              placeholder="admin@partfinder.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
 
-              <label htmlFor="admin-password">Password</label>
-              <input
-                id="admin-password"
-                type="password"
-                placeholder="Enter password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
+            <label htmlFor="admin-password">Password</label>
+            <input
+              id="admin-password"
+              type="password"
+              placeholder="Enter password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
 
-              {error ? <p className="form-error">{error}</p> : null}
+            {error ? <p className="form-error">{error}</p> : null}
 
-              <button type="submit" className="btn-primary" disabled={loginPending}>
-                {loginPending ? 'Signing in…' : 'Login'}
-              </button>
-            </form>
-          </section>
-        </main>
-      </>
+            <button type="submit" className="btn-primary" disabled={loginPending}>
+              {loginPending ? 'Signing in…' : 'Login'}
+            </button>
+          </form>
+        </section>
+      </main>
+    )
+  }
+
+  if (!isAuthenticated && isPublicDashboardRoute) {
+    return (
+      <main className="page">
+        <header className="hero">
+          <p className="badge">Public Dashboard</p>
+          <h1>PartFinder platform overview</h1>
+          <p className="sub">This dashboard is visible to anyone without signing in.</p>
+          <div className="actions">
+            <Link to="/admin" className="btn-primary">
+              Admin Login
+            </Link>
+          </div>
+        </header>
+        <DashboardSection />
+      </main>
     )
   }
 
@@ -336,7 +285,6 @@ function AdminPortalPage({ theme, onToggleTheme }: { theme: 'light' | 'dark'; on
                         : 'Welcome to the admin portal'}
             </p>
           </div>
-          <ThemeToggleBtn theme={theme} onToggleTheme={onToggleTheme} />
         </header>
         {isOrganizationsPage ? (
           <OrganizationsSection onSessionExpired={handleSessionExpired} />
